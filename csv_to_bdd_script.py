@@ -3,14 +3,16 @@ import csv
 import sqlite3
 
 
-def test_read_sqlite_literals():
-    """ Read SQLite literals from a CSV file. """
+def import_csv_to_sqlite():
+    """ Read CSV file and import lines to sqlite. """
     sqlite3.register_adapter(str, str)
 
-    with sqlite3.connect('db.sqlite3') as conn, open('correspondance-code-insee-code-postal.csv', 'rt',
-                                                     encoding='utf-8', newline='') as src:
+    with sqlite3.connect('db.sqlite3') as connexion, open('correspondance-code-insee-code-postal.csv', 'rt',
+                                                          encoding='utf-8', newline='') as src:
 
-        cursor = conn.cursor()
+        cursor = connexion.cursor()
+
+        # Clear tables and reset auto-increment of primary keys
         cursor.execute('DELETE FROM test_app_region')
         cursor.execute('DELETE FROM sqlite_sequence WHERE name="test_app_region"')
         cursor.execute('DELETE FROM test_app_county')
@@ -18,35 +20,31 @@ def test_read_sqlite_literals():
         cursor.execute('DELETE FROM test_app_city')
         cursor.execute('DELETE FROM sqlite_sequence WHERE name="test_app_city"')
 
-        regions_data = dict()
-        counties_data = dict()
-        cities_data = dict()
+        states = dict()
+        counties = dict()
         for row in csv.DictReader(src, delimiter=';'):
             code_region, region, code_departement, departement, code_insee, code_postal, commune, population, superficie = \
                 row.get('Code Région'), row.get('Région'), row.get('Code Département'), row.get('Département'), row.get(
                     'Code INSEE'), row.get('Code Postal'), row.get('Commune'), row.get('Population'), row.get(
                     'Superficie')
-            if code_region not in regions_data:
-                region_query = "INSERT INTO test_app_region (code, name) VALUES (?, ?)"
-                region_data = (code_region, region)
-                cursor.execute(region_query, region_data)
-                regions_data[code_region] = cursor.lastrowid
+            if code_region not in states:
+                state_query = "INSERT INTO test_app_region (code, name) VALUES (?, ?)"
+                state_data = (code_region, region)
+                cursor.execute(state_query, state_data)
+                # Add state to dictionary to avoid duplicates
+                states[code_region] = cursor.lastrowid
 
-            if departement not in counties_data:
+            if departement not in counties:
                 county_query = "INSERT INTO test_app_county (code, name, region_id) VALUES (?, ?, ?)"
-                county_data = (code_departement, departement, regions_data[code_region])
+                county_data = (code_departement, departement, states[code_region])
                 cursor.execute(county_query, county_data)
-                counties_data[departement] = cursor.lastrowid
+                # Add county to dictionary to avoid duplicates
+                counties[departement] = cursor.lastrowid
 
-            if code_insee not in cities_data:
-                city_query = "INSERT INTO test_app_city (code_insee, code_postal, name, population, area, county_id) " \
-                             "VALUES (?, ?, ?, ?, ?, ?)"
-                city_data = (code_insee, code_postal, commune, population, superficie, counties_data[departement])
-                cursor.execute(city_query, city_data)
-
-        # counties_data.append((row.get('Code Département'), row.get('Département')))
-        # counties_query = "INSERT INTO test_app_county (code, name, region_id) VALUES (?, ?, ?)"
-        # cursor.executemany(counties_query, counties_data)
+            city_query = "INSERT INTO test_app_city (code_insee, code_postal, name, population, area, county_id) " \
+                         "VALUES (?, ?, ?, ?, ?, ?)"
+            city_data = (code_insee, code_postal, commune, population, superficie, counties[departement])
+            cursor.execute(city_query, city_data)
 
 
-test_read_sqlite_literals()
+import_csv_to_sqlite()

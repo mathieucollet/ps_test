@@ -3,31 +3,39 @@ from rest_framework import serializers
 
 from test_app.models import Region, County, City
 
-NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 
+def get_nominatim(state: str, field: str) -> str:
+    """ Get nominatim information for a specific state
 
-def get_nominatim(obj):
-    params = {'country': 'France', 'state': obj.name, 'format': 'json'}
-    response = requests.get(NOMINATIM_URL, params)
-    data = response.json()
+    :param state: string The name of the state
+    :param field: The field to return in the response
+    :return: string """
+
+    url = "https://nominatim.openstreetmap.org/search"
+    params = {'country': 'France', 'state': state, 'format': 'json'}
+    response = requests.get(url, params)
+    json = response.json()
+
+    data = json[0][field] if json else 'Nominatim n\'a pas trouvé de correspondance'
+
     return data
 
 
 class RegionSerializer(serializers.HyperlinkedModelSerializer):
+    # Annotation fields
     totalPopulation = serializers.DecimalField(max_digits=10, decimal_places=1, coerce_to_string=False)
     totalArea = serializers.IntegerField()
+    # Method fields
     lat = serializers.SerializerMethodField()
     lon = serializers.SerializerMethodField()
 
     @staticmethod
     def get_lat(obj):
-        data = get_nominatim(obj)
-        return data[0]['lat'] if data else 'Nominatim n\'a pas trouvé de correspondance'
+        return get_nominatim(obj.name, 'lat')
 
     @staticmethod
     def get_lon(obj):
-        data = get_nominatim(obj)
-        return data[0]['lon'] if data else 'Nominatim n\'a pas trouvé de correspondance'
+        return get_nominatim(obj.name, 'lon')
 
     class Meta:
         model = Region
